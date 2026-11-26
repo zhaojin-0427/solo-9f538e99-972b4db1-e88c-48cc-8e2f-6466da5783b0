@@ -1,0 +1,73 @@
+services:
+  grading-a:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: grading-transfer-service:1.0.0
+    container_name: grading-point-a
+    environment:
+      SITE_ID: point-a
+      DATABASE_PATH: /data/grading-a.db
+      SEED_PREFIX: A
+      SEED_COUNT: "8"
+      # Point A can also receive if needed; generous quota for the demo.
+      MAX_UNSCORED: "30"
+      DEFAULT_TARGET_BASE_URL: http://grading-b:8000
+      HTTP_TIMEOUT: "5"
+      RECOVERY_INTERVAL_SECONDS: "2"
+    ports:
+      - "8000:8000"
+    volumes:
+      - grading-a-data:/data
+    depends_on:
+      grading-b:
+        condition: service_healthy
+    restart: unless-stopped
+    init: true
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; r=urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2); sys.exit(0 if r.status == 200 else 1)"
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+  grading-b:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: grading-transfer-service:1.0.0
+    container_name: grading-point-b
+    environment:
+      SITE_ID: point-b
+      DATABASE_PATH: /data/grading-b.db
+      SEED_PREFIX: B
+      SEED_COUNT: "2"
+      # Two built-in unscored papers + at most three transferred papers.
+      MAX_UNSCORED: "5"
+      DEFAULT_TARGET_BASE_URL: http://grading-a:8000
+      HTTP_TIMEOUT: "5"
+      RECOVERY_INTERVAL_SECONDS: "2"
+    ports:
+      - "8001:8000"
+    volumes:
+      - grading-b-data:/data
+    restart: unless-stopped
+    init: true
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; r=urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2); sys.exit(0 if r.status == 200 else 1)"
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+volumes:
+  grading-a-data:
+  grading-b-data:
